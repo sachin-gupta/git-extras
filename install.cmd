@@ -5,6 +5,9 @@ setlocal
 :: You need to escape ! afterwards with ^^! or "^!"
 SETLOCAL enabledelayedexpansion
 
+:: Made True to Log Files Installation 
+SET DEBUG="true"
+
 :: A comment on quotes around file path variables:
 :: only add quotes around the variable when you use the variable
 :: as a file path (exists, type, pipe,...) and the parenthesis of a
@@ -84,6 +87,9 @@ echo Installing to %PREFIX%
 SET HTMLDIR=%PREFIX%\share\doc\git-doc
 SET GITEXTRAS=%~dp0
 
+:: Remove Trailing Slash from Location of Installers
+IF %GITEXTRAS:~-1%==\ SET GITEXTRAS=%GITEXTRAS:~0,-1%
+
 IF NOT EXIST "%PREFIX%\bin" MKDIR "%PREFIX%\bin"
 
 :: Check that we can install into that dir or need admin rights...
@@ -106,20 +112,60 @@ if "%IS_WRITEABLE%"=="no" (
 
 SET COMMANDS_WITHOUT_REPO=git-alias git-extras git-fork git-setup
 
-echo Installing binaries...
+:: Modified Comment to Show Source folder
+ECHO Installing binaries [SRC: %GITEXTRAS%]...
+
+:: Deleting Existing Files Before Rebuild
 FOR /R "%GITEXTRAS%\bin" %%i in (*.*) DO (
+    IF EXIST "%PREFIX%\bin\%%~ni" (
+        IF %DEBUG%=="true" ( ECHO "DEL: %PREFIX%\bin\%%~ni ..." )
+        DEL /F /Q "%PREFIX%\bin\%%~ni"
+    )
+)
+:: Deleting Existing Files Before Rebuild
+FOR %%i in (%COMMANDS_WITHOUT_REPO%) DO (
+    IF EXIST "%PREFIX%\bin\%%i" (
+        IF %DEBUG%=="true" ( ECHO "DEL: %PREFIX%\bin\%%i ..." )
+        DEL /F /Q "%PREFIX%\bin\%%i"
+    )
+)
+
+FOR /R "%GITEXTRAS%\bin" %%i in (*.*) DO (
+::  Fixation for Windows 10.0.17134 Build 17134 (Won't install without /E)    
+::  Echo file being written for testing
+    IF %DEBUG%=="true" ( ECHO "Write #1: %PREFIX%\bin\%%~ni" )
+    ECHO  + Header
     ECHO #^^!/usr/bin/env bash > "%PREFIX%\bin\%%~ni"
+    ECHO  + helper\reset-env
     TYPE "%GITEXTRAS%\helper\reset-env" >> "%PREFIX%\bin\%%~ni"
+    ECHO  + helper\git-extra-utility
     TYPE "%GITEXTRAS%\helper\git-extra-utility" >> "%PREFIX%\bin\%%~ni"
+    ECHO  + helper\is-git-repo
     TYPE "%GITEXTRAS%\helper\is-git-repo" >> "%PREFIX%\bin\%%~ni"
-    MORE +2 "%GITEXTRAS%\bin\%%~ni" >> "%PREFIX%\bin\%%~ni"
+    
+    
+    :: Added /E Option for Installation Fix On Windows 10 Higher Version
+    ECHO  + %GITEXTRAS%\bin\%%~ni
+    MORE /E +2 "%GITEXTRAS%\bin\%%~ni" >> "%PREFIX%\bin\%%~ni"
+    ECHO.
 )
 
 FOR %%i in (%COMMANDS_WITHOUT_REPO%) DO (
+::  Fixation for Windows 10.0.17134 Build 17134 (Won't install without /E) 
+::  Echo file being written for testing
+    IF %DEBUG%=="true" ( ECHO "Write #2: %PREFIX%\bin\%%i" )
+
+    ECHO  + Header
     ECHO #^^!/usr/bin/env bash > "%PREFIX%\bin\%%i"
+    ECHO  + helper\reset-env
     TYPE "%GITEXTRAS%\helper\reset-env" >> "%PREFIX%\bin\%%i"
+    ECHO  + helper\git-extra-utility
     TYPE "%GITEXTRAS%\helper\git-extra-utility" >> "%PREFIX%\bin\%%i"
-    MORE +2 "%GITEXTRAS%\bin\%%i" >> "%PREFIX%\bin\%%i"
+    
+    ::  Added /E Option for Installation Fix On Windows 10 Higher Version
+    ECHO  + %GITEXTRAS%\bin\%%i
+    MORE /E +2 "%GITEXTRAS%\bin\%%i" >> "%PREFIX%\bin\%%i"
+    ECHO.
 )
 
 echo Installing man pages...
@@ -148,6 +194,10 @@ if not exist "%GIT_INSTALL_DIR%\usr\bin\column.exe" (
 
 
 :exit
+:: Sync Unflushed File Buffers
+sync.exe c:
+
+:: Actual Code to From Original
 @chcp %CP% > NUL
 @endlocal enabledelayedexpansion
 @endlocal
